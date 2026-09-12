@@ -96,7 +96,7 @@ and the app keeps working. A demo that dies with its LLM is not a product.
 `public/yadro/fa3.js` and `public/yadro/slownie.js` come from the author's existing
 invoicing project, unchanged: the FA(3) XML builder, NIP and bank-account checksums,
 VAT totals, the pre-export validator, and Polish amount-in-words with declension.
-The schema in `public/schema/FA3.xsd` is the real one published by the Polish Ministry
+The schema in `schema/FA3.xsd` is the real one published by the Polish Ministry
 of Finance.
 
 The hackathon work is the voice layer on top — and the decision to reuse a working core
