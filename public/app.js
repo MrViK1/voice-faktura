@@ -118,6 +118,8 @@ function czytajWiersze() {
   STAN.nabywca.nip = nip || null;
   STAN.nabywca.typ = nip ? 'NIP' : (STAN.prywatna ? 'BRAK' : null);
   STAN.waluta = $('#fWaluta').value || 'PLN';
+  var pz = $('#fZw').value.trim();
+  STAN.zwolnienie = pz ? { rodzaj: /dyrektyw/i.test(pz) ? 'dyrektywa' : 'ustawa', podstawa: pz } : null;
   przelicz();
   pytanie();
 }
@@ -127,7 +129,7 @@ $('#btnDodaj').addEventListener('click', function () {
   pokazWszystko();
 });
 
-['#fNabywca', '#fNip', '#fWaluta'].forEach(function (s) {
+['#fNabywca', '#fNip', '#fWaluta', '#fZw'].forEach(function (s) {
   $(s).addEventListener('input', czytajWiersze);
 });
 
@@ -137,6 +139,9 @@ function pokazWszystko() {
   $('#fNip').value     = STAN.nabywca.nip || '';
   $('#fWaluta').value  = STAN.waluta || 'PLN';
   if (STAN.prywatna) $('#fNip').placeholder = 'osoba prywatna — BrakID';
+  var maZw = STAN.pozycje.some(function (p) { return p.stawka === 'zw'; });
+  $('#blokZw').hidden = !maZw;
+  $('#fZw').value = (STAN.zwolnienie && STAN.zwolnienie.podstawa) || '';
   $('#blokPola').hidden = false;
   rysujWiersze();
   przelicz();
@@ -192,7 +197,8 @@ $('#btnXml').addEventListener('click', function () {
       numer: 'FV/GLOS/' + dzis.replace(/-/g, '') + '/1',
       dataWystawienia: dzis, dataSprzedazy: dzis,
       miejsceWystawienia: 'Warszawa', waluta: STAN.waluta || 'PLN',
-      platnosc: { forma: '6', termin: dzis }, rodzaj: 'VAT'
+      platnosc: { forma: '6', termin: dzis }, rodzaj: 'VAT',
+      zwolnienie: STAN.zwolnienie || null
     },
     pozycje: ROZBIR.pozycjeGotowe(STAN)
   };

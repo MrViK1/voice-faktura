@@ -303,7 +303,15 @@ function rozbierz(tekst, oczekuje) {
   /* ── позиції: кожна сума в мовленні = окремий рядок фактури ──── */
   p.pozycje = pozycjeZTekstu(t, niski, p.pozycja.stawka);
 
-    /* NIP і приватна особа */
+    /* підстава звільнення від ПДВ — без неї KSeF фактуру не приймає */
+  if (/113|сто\s*тринадцят|л[іи]м[іи]т|200\s*(?:000|тисяч)|др[іи]бн\w*\s*п[іи]дпри/i.test(niski))
+    p.zwolnienie = { rodzaj: 'ustawa', podstawa: 'art. 113 ust. 1 ustawy o VAT' };
+  else if (/\b43\b|сорок\s*три/i.test(niski))
+    p.zwolnienie = { rodzaj: 'ustawa', podstawa: 'art. 43 ust. 1 ustawy o VAT' };
+  else if (/директив|dyrektyw/i.test(niski))
+    p.zwolnienie = { rodzaj: 'dyrektywa', podstawa: 'art. 132 dyrektywy 2006/112/WE' };
+
+  /* NIP і приватна особа */
   var mNip = t.match(/(?:nip|н[іи]п)\D{0,5}((?:\d[\s-]?){10})/i) || t.match(/\b(\d{10})\b/);
   if (mNip) { p.nabywca.nip = mNip[1].replace(/[\s-]/g, ''); p.nabywca.typ = 'NIP'; }
   if (osobaPrywatna(t)) { p.prywatna = true; p.nabywca.typ = 'BRAK'; p.nabywca.nip = null; }
@@ -327,6 +335,13 @@ function rozbierz(tekst, oczekuje) {
     if (oczekuje === 'usluga' && p.pozycja.nazwa === undefined && t.length < 60 && !jedna) {
       p.pozycja.nazwa = t.replace(/^(за|це|послуга|usługa)\s+/i, '').trim();
     }
+    if (oczekuje === 'zwolnienie' && !p.zwolnienie) {
+      /* коротка відповідь на питання про підставу: «так», «ліміт», «як завжди» */
+      if (/так|ліміт|звичайн|як\s*завжди|прив[іи]лей|стандарт/i.test(t))
+        p.zwolnienie = { rodzaj: 'ustawa', podstawa: 'art. 113 ust. 1 ustawy o VAT' };
+      else if (t.trim().length > 4)
+        p.zwolnienie = { rodzaj: 'inna', podstawa: t.trim() };
+    }
     if (oczekuje === 'nabywca' && p.nabywca.nazwa === undefined && t.length < 60) {
       var d = t.split(/[\s,]+/).filter(function (w) { return /^[А-ЯІЇЄҐA-Z]/.test(w); });
       if (d.length) p.nabywca.nazwa = d.length > 1 ? imiePl(d[0]) + ' ' + nazwiskoPl(d[d.length - 1])
@@ -340,12 +355,13 @@ function rozbierz(tekst, oczekuje) {
 /* ── злиття: нове доповнює старе, не стирає його ───────────────── */
 function scal(stan, patch) {
   stan = stan || { nabywca: { nazwa: null, nip: null, typ: null }, prywatna: false,
-                   pozycje: [], waluta: null, historia: [] };
+                   pozycje: [], waluta: null, zwolnienie: null, historia: [] };
   ['nazwa', 'nip', 'typ'].forEach(function (f) {
     if (patch.nabywca[f] !== undefined && patch.nabywca[f] !== null) stan.nabywca[f] = patch.nabywca[f];
   });
   if (patch.prywatna) { stan.prywatna = true; stan.nabywca.typ = 'BRAK'; stan.nabywca.nip = null; }
   if (patch.waluta) stan.waluta = patch.waluta;
+  if (patch.zwolnienie) stan.zwolnienie = patch.zwolnienie;
 
   var nowe = patch.pozycje || [];
   if (nowe.length > 1 || (nowe.length === 1 && !stan.pozycje.length)) {
@@ -370,6 +386,8 @@ function braki(stan) {
   if (!stan.pozycje.length || !stan.pozycje.some(function (p) { return p.cenaNetto > 0; })) b.push('kwota');
   if (stan.pozycje.length && stan.pozycje.some(function (p) { return !p.nazwa; })) b.push('usluga');
   if (!stan.prywatna && !stan.nabywca.nip) b.push('nip');
+  var maZw = stan.pozycje.some(function (p) { return p.stawka === 'zw'; });
+  if (maZw && !(stan.zwolnienie && stan.zwolnienie.podstawa)) b.push('zwolnienie');
   return b;
 }
 
@@ -377,7 +395,8 @@ var PYTANIA = {
   nabywca: 'Кому виставляємо фактуру?',
   kwota:   'Яка сума?',
   usluga:  'За що саме фактура?',
-  nip:     'Який NIP покупця? Якщо це приватна особа — так і скажіть.'
+  nip:     'Який NIP покупця? Якщо це приватна особа — так і скажіть.',
+  zwolnienie: 'На якій підставі звільнення від ПДВ? Скажіть «сто тринадцять», якщо це ліміт 200 тисяч злотих — так у більшості.'
 };
 
 function nastepnePytanie(stan) {

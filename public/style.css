@@ -81,3 +81,6 @@ button.mala.plus{float:none;display:block;width:100%;border:none;border-top:1px 
   .wiersz{grid-template-columns:1fr 1fr;gap:6px}
   .wiersz.szapka{display:none}
 }
+
+.pola.zwolnienie{margin-top:16px}
+.pola.zwolnienie label{grid-column:1/-1}
