@@ -52,6 +52,7 @@ function wyslij(blob) {
       if (!d.text)  { stan('Нічого не почув — спробуйте ще раз'); return; }
       stan('Готово. Можна сказати ще раз або виправити руками.');
       STAN = ROZBIR.scal(STAN, ROZBIR.rozbierz(d.text, OCZEKUJE));
+      zapiszHistorie();
       pokazTekst(STAN.historia);
       pokazWszystko();
     })
@@ -225,9 +226,35 @@ $('#btnPobierz').addEventListener('click', function () {
   a.click();
 });
 
+/* ── памʼять між перезавантаженнями ────────────────────────────
+   Фрази зберігаються, і після перезавантаження розбираються
+   ЗАНОВО — новим кодом. Наговорювати вдруге не треба. */
+var KLUCZ = 'voice-faktura-historia';
+
+function zapiszHistorie() {
+  try { localStorage.setItem(KLUCZ, JSON.stringify(STAN.historia)); } catch (e) {}
+}
+
+function wczytajHistorie() {
+  var h;
+  try { h = JSON.parse(localStorage.getItem(KLUCZ) || '[]'); } catch (e) { return; }
+  if (!h || !h.length) return;
+  STAN = null;
+  h.forEach(function (f) {
+    var q = STAN ? ROZBIR.nastepnePytanie(STAN) : null;
+    STAN = ROZBIR.scal(STAN, ROZBIR.rozbierz(f, q ? q.klucz : null));
+  });
+  pokazTekst(STAN.historia);
+  pokazWszystko();
+  stan('Попередні фрази розібрано заново. Можна говорити далі.');
+}
+
 $('#btnNowa').addEventListener('click', function () {
+  try { localStorage.removeItem(KLUCZ); } catch (e) {}
   STAN = null; OCZEKUJE = null; ostatniXml = ''; ostatniePytanie = '';
   ['#blokTekst', '#blokPola', '#blokXml'].forEach(function (s) { $(s).hidden = true; });
   $('#walidacja').hidden = true;
   stan('Натисніть і скажіть, кому і за що виставити фактуру');
 });
+
+wczytajHistorie();
