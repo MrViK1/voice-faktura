@@ -16,7 +16,8 @@ var USLUGI = {
   'реклам': 'reklama', 'дизайн': 'projekt graficzny',
   'бухгалтер': 'usługi księgowe', 'оренд': 'najem', 'найм': 'najem',
   'матеріал': 'materiały',
-  'внес': 'składki', 'опла[тч]': 'opłata', 'збір': 'opłata',
+  'внес': 'składki', 'опла': 'opłata', 'збір': 'opłata',
+  'розход': 'dodatkowe koszty', 'розхід': 'dodatkowe koszty', 'витрат': 'dodatkowe koszty',
   'супров': 'obsługa', 'допомог': 'pomoc', 'оформленн': 'obsługa formalności',
   'підготовк': 'przygotowanie dokumentów', 'юридичн': 'usługi prawne'
 };
