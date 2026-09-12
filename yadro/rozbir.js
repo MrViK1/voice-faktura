@@ -286,7 +286,7 @@ function pozycjeZTekstu(t, niski, stawkaOgolna) {
     var st = null;
     var mSt = (przedOkno + ' ' + poOkno).match(/(\d{1,2})\s*(?:%|відсотк[а-яіїєґ]*|procent[a-z]*)/);
     if (mSt) st = String(Number(mSt[1]));
-    if (/зві?льнен|zwolnion|без\s*пдв/i.test(przedOkno + ' ' + poOkno)) st = 'zw';
+    if (/зві?льнен|zwolnion|без\s*пд[вб]/i.test(przedOkno + ' ' + poOkno)) st = 'zw';
 
     poz.push({ nazwa: nazwa, ilosc: jed.ilosc, jednostka: jed.jednostka,
                cenaNetto: k.v, stawka: st || stawkaOgolna || null });
@@ -304,7 +304,7 @@ function rozbierz(tekst, oczekuje) {
   var mSt = niski.match(/(?:^|[\s,;:(])ставк[а-яіїєґ]*\s*(?:пдв|vat)?\s*(\d{1,2})\s*(?:%|відсот|proc)?/) ||
             niski.match(/(\d{1,2})\s*(?:%|відсотк[а-яіїєґ]*|procent[a-z]*)/);
   if (mSt) p.pozycja.stawka = String(Number(mSt[1]));
-  if (/зві?льнен|zwolnion|без\s*пдв/.test(niski)) p.pozycja.stawka = 'zw';
+  if (/зві?льнен|zwolnion|без\s*пд[вб]/.test(niski)) p.pozycja.stawka = 'zw';
   /* «плюс ВАТ», «z VAT» — базова ставка 23%. Модель часто чує «бат»/«ват». */
   if (!p.pozycja.stawka && /(?:плюс|\+|з|z)\s*(?:пдв|vat|[бв]ат)\b/i.test(niski)) p.pozycja.stawka = '23';
 
@@ -350,10 +350,13 @@ function rozbierz(tekst, oczekuje) {
     }
     if (oczekuje === 'zwolnienie' && !p.zwolnienie) {
       /* коротка відповідь на питання про підставу: «так», «ліміт», «як завжди» */
-      if (/так|ліміт|звичайн|як\s*завжди|прив[іи]лей|стандарт/i.test(t))
+      var krotka = t.trim();
+      if (/^(так|ага|звичайн\w*|як\s*завжди|ліміт\w*|стандарт\w*)[.!]?$/i.test(krotka))
         p.zwolnienie = { rodzaj: 'ustawa', podstawa: 'art. 113 ust. 1 ustawy o VAT' };
-      else if (t.trim().length > 4)
-        p.zwolnienie = { rodzaj: 'inna', podstawa: t.trim() };
+      else if (krotka.length < 90 && /(?:art|artyku|стат|ustaw|§|\d{2,3})/i.test(krotka)
+               && !/фактур|злот|консультац|послуг/i.test(krotka))
+        p.zwolnienie = { rodzaj: 'inna', podstawa: krotka };
+      /* інакше — це нова фактура, а не відповідь про підставу: не чіпаємо */
     }
     if (oczekuje === 'nabywca' && p.nabywca.nazwa === undefined && t.length < 60) {
       var d = t.split(/[\s,]+/).filter(function (w) { return /^[А-ЯІЇЄҐA-Z]/.test(w); });

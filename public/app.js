@@ -267,6 +267,9 @@ function zModelu(d) {
   if (d.waluta) STAN.waluta = d.waluta;
   if (d.zwolnienie && d.zwolnienie.podstawa)
     STAN.zwolnienie = { rodzaj: 'ustawa', podstawa: d.zwolnienie.podstawa };
+  else if (STAN.zwolnienie && STAN.zwolnienie.podstawa &&
+           !/(?:art|ustaw|dyrektyw|§)/i.test(STAN.zwolnienie.podstawa))
+    STAN.zwolnienie = null;   /* у полі було сміття — модель його не підтвердила */
   if (d.pozycje && d.pozycje.length) {
     STAN.pozycje = d.pozycje.map(function (p) {
       return { nazwa: p.nazwa || null, ilosc: Number(p.ilosc) || 1,
