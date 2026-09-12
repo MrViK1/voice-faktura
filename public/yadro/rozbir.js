@@ -17,7 +17,9 @@ var USLUGI = {
   'бухгалтер': 'usługi księgowe', 'оренд': 'najem', 'найм': 'najem',
   'матеріал': 'materiały',
   'внес': 'składki', 'опла': 'opłata', 'збір': 'opłata',
-  'фотограф': 'usługi fotograficzne', 'фото': 'usługi fotograficzne',
+  'ксерок': 'kserokopie', 'копі': 'kserokopie', 'нотар': 'poświadczenie notarialne',
+  'зав[іи]рен': 'poświadczenie', 'виїзд': 'wyjazd', 'дов[іи]ренн': 'pełnomocnictwo',
+  'апостил': 'apostille', 'фотограф': 'usługi fotograficzne', 'фото': 'usługi fotograficzne',
   'в[іи]део': 'usługi wideo', 'зйомк': 'usługi fotograficzne',
   'вантаж': 'transport', 'переїзд': 'przeprowadzka', 'меблі': 'meble',
   'розход': 'dodatkowe koszty', 'розхід': 'dodatkowe koszty', 'витрат': 'dodatkowe koszty',
@@ -297,6 +299,10 @@ function pozycjeZTekstu(t, niski, stawkaOgolna) {
 /* ── розбір однієї фрази: повертає ЛИШЕ те, що почуто ──────────── */
 function rozbierz(tekst, oczekuje) {
   var t = String(tekst || '').replace(/\s+/g, ' ').trim();
+  /* «1755 злотих 71 грош» — це одна сума 1755,71, а не дві.
+     Так само «450 zł 50 gr». Зліплюємо ДО розбору позицій. */
+  t = t.replace(/(\d[\d\s]*)\s*(?:злот[а-яіїєґ]*|золот[а-яіїєґ]*|zł|złot[a-z]*)\s*(\d{1,2})\s*(?:грош[а-яіїєґ]*|гр\b|gr\b|groszy)/gi,
+    function (m, z, g) { return String(z).replace(/\s/g, '') + '.' + (g.length === 1 ? '0' + g : g) + ' злотих'; });
   var niski = t.toLowerCase();
   var p = { nabywca: {}, pozycja: {}, pozycje: [], waluta: null, prywatna: false, tekst: t };
 
