@@ -145,7 +145,7 @@ const serwer = http.createServer(async (req, res) => {
 
   /* статика: public/ і yadro/ */
   let p = u.pathname === '/' ? '/index.html' : u.pathname;
-  const korzenie = [path.join(__dirname, 'public'), __dirname];
+  const korzenie = [path.join(__dirname, 'public')];
   for (const k of korzenie) {
     const plik = path.join(k, p);
     if (plik.startsWith(k) && fs.existsSync(plik) && fs.statSync(plik).isFile()) {

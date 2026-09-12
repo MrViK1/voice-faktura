@@ -1,0 +1,8 @@
+{
+  "name": "voice-faktura",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mow po ukrainsku - dostajesz polska fakture FA(3)",
+  "scripts": { "dev": "node server.js" },
+  "engines": { "node": ">=20" }
+}
