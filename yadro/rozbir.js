@@ -17,6 +17,9 @@ var USLUGI = {
   'бухгалтер': 'usługi księgowe', 'оренд': 'najem', 'найм': 'najem',
   'матеріал': 'materiały',
   'внес': 'składki', 'опла': 'opłata', 'збір': 'opłata',
+  'фотограф': 'usługi fotograficzne', 'фото': 'usługi fotograficzne',
+  'в[іи]део': 'usługi wideo', 'зйомк': 'usługi fotograficzne',
+  'вантаж': 'transport', 'переїзд': 'przeprowadzka', 'меблі': 'meble',
   'розход': 'dodatkowe koszty', 'розхід': 'dodatkowe koszty', 'витрат': 'dodatkowe koszty',
   'супров': 'obsługa', 'допомог': 'pomoc', 'оформленн': 'obsługa formalności',
   'підготовк': 'przygotowanie dokumentów', 'юридичн': 'usługi prawne'
