@@ -1,0 +1,6 @@
+# ключі — НІКОЛИ в GitHub
+.env
+.env.*
+*.key
+node_modules/
+.DS_Store

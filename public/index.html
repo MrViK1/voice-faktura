@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Faktura — говори, і фактура готова</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <div class="marka">Voice&nbsp;Faktura</div>
+  <div class="pidzagolovok">Говориш українською — виходить польська FA(3)</div>
+</header>
+
+<main>
+  <section class="karta mikrofon">
+    <button id="btnMic" class="mic" aria-label="Записати">
+      <span class="kolo"></span><span class="ikona">🎙</span>
+    </button>
+    <div id="stan" class="stan">Натисніть і скажіть, кому і за що виставити фактуру</div>
+    <div class="mova">
+      <label><input type="radio" name="lang" value="uk" checked> українська</label>
+      <label><input type="radio" name="lang" value="pl"> polski</label>
+      <label><input type="radio" name="lang" value="auto"> авто</label>
+    </div>
+    <div class="pidkazka">Приклад: «Виставити фактуру Ковальському за консультацію, одна година, тисяча п'ятсот злотих, ставка двадцять три»</div>
+  </section>
+
+  <section class="karta" id="blokTekst" hidden>
+    <h2>Почуто <button id="btnNowa" class="mala">почати заново</button></h2>
+    <p id="tekst" class="tekst"></p>
+  </section>
+
+  <section class="karta" id="blokPola" hidden>
+    <h2>Фактура</h2>
+    <div class="pola">
+      <label>Nabywca <input id="fNabywca"></label>
+      <label>NIP <input id="fNip" placeholder="brak — osoba prywatna"></label>
+      <label>Nazwa usługi <input id="fNazwa"></label>
+      <label>Ilość <input id="fIlosc" type="number" step="0.001"></label>
+      <label>Jednostka <input id="fJedn"></label>
+      <label>Cena netto <input id="fCena" type="number" step="0.01"></label>
+      <label>Stawka VAT
+        <select id="fStawka">
+          <option value="23">23%</option><option value="8">8%</option>
+          <option value="5">5%</option><option value="0">0%</option><option value="zw">zw.</option>
+        </select>
+      </label>
+      <label>Waluta <input id="fWaluta" value="PLN"></label>
+    </div>
+    <div id="brakuje" class="brakuje" hidden></div>
+    <div class="sumy">
+      <div><span>netto</span><b id="sNetto">0,00</b></div>
+      <div><span>VAT</span><b id="sVat">0,00</b></div>
+      <div class="duza"><span>brutto</span><b id="sBrutto">0,00</b></div>
+    </div>
+    <div id="slownie" class="slownie"></div>
+    <div class="knopki">
+      <button id="btnXml" class="glowna">Zbuduj FA(3) XML</button>
+      <button id="btnPobierz" class="druga" hidden>Pobierz XML</button>
+    </div>
+    <div id="walidacja" class="walidacja" hidden></div>
+  </section>
+
+  <section class="karta" id="blokXml" hidden>
+    <h2>FA(3) XML</h2>
+    <pre id="xml"></pre>
+  </section>
+</main>
+
+<footer>
+  Rozpoznawanie mowy: <b>AssemblyAI</b> · Schemat FA(3) wg Ministerstwa Finansów ·
+  Dane nie opuszczają tej maszyny poza transkrypcją
+</footer>
+
+<script src="/yadro/fa3.js"></script>
+<script src="/yadro/slownie.js"></script>
+<script src="/yadro/rozbir.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
