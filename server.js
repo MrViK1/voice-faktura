@@ -5,7 +5,53 @@ const http = require('http'), fs = require('fs'), path = require('path');
 
 const KEY = (fs.readFileSync(path.join(__dirname, '.env'), 'utf8')
   .match(/ASSEMBLYAI_API_KEY=(.+)/) || [])[1];
-if (!KEY) { console.error('Немає ключа в .env'); process.exit(1); }
+if (!KEY) { console.error('Немає ключа AssemblyAI в .env'); process.exit(1); }
+
+/* Ключ моделі. Якщо його немає — розбір падає на словник у браузері. */
+const GROQ = (fs.readFileSync(path.join(__dirname, '.env'), 'utf8')
+  .match(/GROQ_API_KEY=(.+)/) || [])[1];
+
+const INSTRUKCJA = [
+  'Ти перетворюєш надиктований українською або польською текст у структуру польської фактури FA(3).',
+  'Відповідай ТІЛЬКИ JSON, без пояснень.',
+  '',
+  'Схема:',
+  '{"nabywca":{"nazwa":string|null,"nip":string|null,"prywatna":boolean},',
+  ' "waluta":"PLN"|"EUR"|"USD","zwolnienie":{"podstawa":string}|null,',
+  ' "pozycje":[{"nazwa":string,"ilosc":number,"jednostka":string,"cenaNetto":number,',
+  '             "stawka":"23"|"8"|"5"|"0"|"zw"}]}',
+  '',
+  'Правила:',
+  '1. nazwa позиції — ПОЛЬСЬКОЮ, як пишуть у фактурах: konsultacja, tłumaczenie,',
+  '   pomoc w sprawie karty pobytu, składki, usługi fotograficzne, dodatkowe koszty.',
+  '2. Імена людей — польська транслітерація в НАЗИВНОМУ відмінку:',
+  '   Ковальському→Kowalski, Петра Івановича→Petro Iwanowicz, Іни→Ina, Ірина Іванівна→Iryna Iwaniwna.',
+  '3. Кожна названа сума — окрема позиція. Не зливай позиції і не вигадуй нових.',
+  '4. jednostka польськими скороченнями: godz., szt., usł., mies., dzień, kg, m.',
+  '5. «без ПДВ», «звільнено» → stawka "zw". Ставку не назвали → "23".',
+  '6. «сто тринадцять», «ліміт», «200 тисяч» → zwolnienie.podstawa = "art. 113 ust. 1 ustawy o VAT".',
+  '7. «приватна особа», «фізична особа» → prywatna: true, nip: null.',
+  '8. Чого не сказали — null. Не домислюй.',
+  '9. Якщо дано попередній стан — ОНОВИ його новими фразами, не скидай те, що вже є.'
+].join('\n');
+
+async function rozbierzModelem(historia, stanTeraz) {
+  if (!GROQ) throw new Error('немає ключа моделі');
+  const tresc = (stanTeraz ? 'Поточний стан фактури:\n' + JSON.stringify(stanTeraz) + '\n\n' : '')
+    + 'Сказано:\n' + historia.map((h, i) => (i + 1) + '. ' + h).join('\n');
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + GROQ, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: 'openai/gpt-oss-120b', temperature: 0, max_tokens: 1500,
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'system', content: INSTRUKCJA }, { role: 'user', content: tresc }]
+    })
+  });
+  if (!r.ok) throw new Error('модель: ' + r.status + ' ' + (await r.text()).slice(0, 200));
+  const d = await r.json();
+  return JSON.parse(d.choices[0].message.content);
+}
 
 const AAI = 'https://api.assemblyai.com';
 const TYPY = { '.html':'text/html; charset=utf-8', '.js':'application/javascript; charset=utf-8',
@@ -78,9 +124,22 @@ const serwer = http.createServer(async (req, res) => {
     return;
   }
 
+  if (u.pathname === '/api/extract' && req.method === 'POST') {
+    try {
+      const body = JSON.parse((await czytajCiało(req)).toString('utf8') || '{}');
+      const wynik = await rozbierzModelem(body.historia || [], body.stan || null);
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, dane: wynik }));
+    } catch (e) {
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: String(e.message || e) }));
+    }
+    return;
+  }
+
   if (u.pathname === '/api/health') {
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, klucz: KEY.slice(0, 4) + '…' }));
+    res.end(JSON.stringify({ ok: true, mowa: KEY.slice(0, 4) + '…', model: GROQ ? 'є' : 'немає' }));
     return;
   }
 

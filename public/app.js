@@ -51,10 +51,13 @@ function wyslij(blob) {
       if (d.error) { stan('Помилка: ' + d.error); return; }
       if (!d.text)  { stan('Нічого не почув — спробуйте ще раз'); return; }
       stan('Готово. Можна сказати ще раз або виправити руками.');
+      /* спершу словник — щоб екран заповнився одразу */
       STAN = ROZBIR.scal(STAN, ROZBIR.rozbierz(d.text, OCZEKUJE));
       zapiszHistorie();
       pokazTekst(STAN.historia);
       pokazWszystko();
+      /* потім модель — вона розуміє будь-які слова, і уточнює те, що словник не взяв */
+      uscislijModelem();
     })
     .catch(function (e) {
       $('#btnMic').classList.remove('czeka');
@@ -226,6 +229,58 @@ $('#btnPobierz').addEventListener('click', function () {
   a.click();
 });
 
+/* ── уточнення моделлю ─────────────────────────────────────────
+   Словник дає швидкий результат із відомих слів. Модель бере
+   будь-які слова й будь-які відмінки. Немає моделі — лишається словник. */
+function uscislijModelem() {
+  znak('модель думає…');
+  fetch('/api/extract', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ historia: STAN.historia, stan: doModelu(STAN) })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (o) {
+      if (!o.ok || !o.dane) { znak('словник'); return; }
+      zModelu(o.dane);
+      pokazWszystko();
+      znak('модель');
+    })
+    .catch(function () { znak('словник'); });
+}
+
+function doModelu(st) {
+  return {
+    nabywca: { nazwa: st.nabywca.nazwa, nip: st.nabywca.nip, prywatna: !!st.prywatna },
+    waluta: st.waluta || 'PLN',
+    zwolnienie: st.zwolnienie || null,
+    pozycje: st.pozycje
+  };
+}
+
+function zModelu(d) {
+  if (d.nabywca) {
+    if (d.nabywca.nazwa) STAN.nabywca.nazwa = d.nabywca.nazwa;
+    STAN.nabywca.nip = d.nabywca.nip || null;
+    if (d.nabywca.prywatna) STAN.prywatna = true;
+    STAN.nabywca.typ = STAN.nabywca.nip ? 'NIP' : (STAN.prywatna ? 'BRAK' : null);
+  }
+  if (d.waluta) STAN.waluta = d.waluta;
+  if (d.zwolnienie && d.zwolnienie.podstawa)
+    STAN.zwolnienie = { rodzaj: 'ustawa', podstawa: d.zwolnienie.podstawa };
+  if (d.pozycje && d.pozycje.length) {
+    STAN.pozycje = d.pozycje.map(function (p) {
+      return { nazwa: p.nazwa || null, ilosc: Number(p.ilosc) || 1,
+               jednostka: p.jednostka || 'usł.', cenaNetto: Number(p.cenaNetto) || 0,
+               stawka: String(p.stawka || '23') };
+    });
+  }
+}
+
+function znak(t) {
+  var el = document.getElementById('znak');
+  if (el) el.textContent = t;
+}
+
 /* ── памʼять між перезавантаженнями ────────────────────────────
    Фрази зберігаються, і після перезавантаження розбираються
    ЗАНОВО — новим кодом. Наговорювати вдруге не треба. */
@@ -247,6 +302,7 @@ function wczytajHistorie() {
   pokazTekst(STAN.historia);
   pokazWszystko();
   stan('Попередні фрази розібрано заново. Можна говорити далі.');
+  uscislijModelem();
 }
 
 $('#btnNowa').addEventListener('click', function () {
