@@ -60,3 +60,24 @@ button.mala{float:right;background:transparent;border:1px solid var(--ramka);col
   border-radius:8px;padding:4px 10px;font-size:11px;font-family:inherit;cursor:pointer;
   text-transform:none;letter-spacing:0}
 button.mala:hover{color:var(--tekst)}
+
+.pola.naglowek{margin-bottom:18px}
+.tabela{border:1px solid var(--ramka);border-radius:10px;overflow:hidden}
+.wiersz{display:grid;grid-template-columns:minmax(0,3fr) 70px 70px 110px 80px 32px;
+  gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--ramka)}
+.wiersz:last-of-type{border-bottom:none}
+.wiersz.szapka{background:#111720;font-size:11px;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--slaby)}
+.wiersz input,.wiersz select{background:#0f141a;border:1px solid var(--ramka);color:var(--tekst);
+  border-radius:7px;padding:8px 9px;font-size:15px;font-family:inherit;width:100%;min-width:0}
+.wiersz input:focus,.wiersz select:focus{outline:2px solid var(--akcent);outline-offset:1px}
+.wiersz input.liczba{font-variant-numeric:tabular-nums;text-align:right}
+button.usun{background:transparent;border:none;color:var(--slaby);font-size:19px;
+  cursor:pointer;line-height:1;padding:4px}
+button.usun:hover{color:var(--zle)}
+button.mala.plus{float:none;display:block;width:100%;border:none;border-top:1px solid var(--ramka);
+  border-radius:0;padding:10px;color:var(--akcent);font-size:13px;background:#111720}
+@media (max-width:620px){
+  .wiersz{grid-template-columns:1fr 1fr;gap:6px}
+  .wiersz.szapka{display:none}
+}

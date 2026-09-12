@@ -16,6 +16,7 @@ var USLUGI = {
   'реклам': 'reklama', 'дизайн': 'projekt graficzny',
   'бухгалтер': 'usługi księgowe', 'оренд': 'najem', 'найм': 'najem',
   'матеріал': 'materiały',
+  'внес': 'składki', 'опла[тч]': 'opłata', 'збір': 'opłata',
   'супров': 'obsługa', 'допомог': 'pomoc', 'оформленн': 'obsługa formalności',
   'підготовк': 'przygotowanie dokumentów', 'юридичн': 'usługi prawne'
 };
@@ -91,7 +92,11 @@ var IMENA = {
   'наталії':'наталія','наталію':'наталія',
   'юлії':'юлія','юлію':'юлія',
   'анни':'анна','анну':'анна',
-  'іни':'іна','іну':'іна','іри':'іра','іру':'іра'
+  'іни':'іна','іну':'іна','іри':'іра','іру':'іра',
+  'галини':'галина','галину':'галина','галині':'галина',
+  'марини':'марина','марину':'марина','валентини':'валентина',
+  'ганни':'ганна','ганну':'ганна','лесі':'леся','лесю':'леся',
+  'зої':'зоя','зою':'зоя','віри':'віра','віру':'віра','надії':'надія','надію':'надія'
 };
 
 function imiePl(slowo) {
@@ -142,7 +147,17 @@ function osobaPrywatna(t) {
 }
 
 /* ── імʼя і прізвище з мовлення ────────────────────────────────── */
-var STOP_SLOVA = /^(це|цей|для|фактур\w*|виставити|nip|н[іи]п|особа|приватна|пан|пані|firma|sp)$/i;
+var STOP_SLOVA = new RegExp('^(' + [
+  'це','цей','ця','для','від','за','на','по','плюс','без','ще','там','тут',
+  'фактура','фактуру','фактури','фактору','фактор','faktura','faktury',
+  'хочу','треба','потрібно','зроби','зробити','напиши','написати','додай',
+  'виставити','виставь','виставляю','висказати','сказати','зробім',
+  'nip','ніп','нип','особа','особу','приватна','приватну','пан','пані',
+  'послуга','послуги','послугу','ціна','ціну','сума','суму','вартість',
+  'одна','один','дві','два','три','штука','штуки','година','години',
+  'firma','sp','карта','карту','карті','побиту','побуту','бету','pobytu',
+  'консультація','консультацію','консультацією','супровід','ремонт','переклад'
+].join('|') + ')$', 'i');
 
 function imieNazwisko(tekst) {
   var zdania = String(tekst).split(/[.!?]+/);
@@ -153,7 +168,7 @@ function imieNazwisko(tekst) {
     for (var i = 0; i < slowa.length; i++) {
       var w = slowa[i].replace(/[.,;:!?]+$/, '');
       var duza = /^[А-ЯІЇЄҐA-Z][а-яіїєґʼ'a-zA-ZżźćńółęąśŻŹĆĄŚĘŁÓŃ-]{2,}$/.test(w);
-      var zle  = i === 0 || STOP_SLOVA.test(w) || SLOVA_CYFRY[w.toLowerCase()] !== undefined
+      var zle  = STOP_SLOVA.test(w) || SLOVA_CYFRY[w.toLowerCase()] !== undefined
                  || JEDNOSTKI[w.toLowerCase()] !== undefined;
       if (duza && !zle) { ciag.push(w); }
       else { if (ciag.length) kandydaci.push(ciag.slice()); ciag = []; }
@@ -169,14 +184,111 @@ function imieNazwisko(tekst) {
   return (imie + ' ' + nazwisko).replace(/\s+/g, ' ').trim();
 }
 
+/* ── позиції з мовлення ─────────────────────────────────────────
+   Кожна сума — якір. Назву беремо з тексту перед нею, а якщо там
+   нічого — з тексту після неї, до наступної суми.
+   «супровід 2800, плюс 300 консультації, плюс внески 1800»
+   → три рядки, а не один.                                        */
+function nazwaZOkna(okno, odKonca) {
+  var niskie = okno.toLowerCase(), trafienia = [];
+  for (var z = 0; z < USLUGI_ZLOZONE.length; z++) {
+    var m = okno.match(USLUGI_ZLOZONE[z][0]);
+    if (m) trafienia.push({ i: okno.indexOf(m[0]), nazwa: USLUGI_ZLOZONE[z][1], waga: 2 });
+  }
+  for (var u in USLUGI) {
+    var i1 = niskie.lastIndexOf(u), i2 = niskie.indexOf(u);
+    if (i2 >= 0) trafienia.push({ i: odKonca ? i1 : i2, nazwa: USLUGI[u], waga: 1 });
+  }
+  for (var o in USLUGI_OGOLNE) {
+    var j = odKonca ? niskie.lastIndexOf(o) : niskie.indexOf(o);
+    if (j >= 0) trafienia.push({ i: j, nazwa: USLUGI_OGOLNE[o], waga: 0 });
+  }
+  if (!trafienia.length) return null;
+  /* беремо найближче до самої суми: з вікна перед нею — останнє,
+     з вікна після неї — перше. За рівної відстані виграє точніша назва. */
+  /* спершу точність назви (складена > конкретна > загальна),
+     за рівної точності — близькість до самої суми */
+  trafienia.sort(function (a, b) {
+    if (b.waga !== a.waga) return b.waga - a.waga;
+    return odKonca ? (b.i - a.i) : (a.i - b.i);
+  });
+  return trafienia[0].nazwa;
+}
+
+function jednostkaZOkna(okno) {
+  var n = okno.toLowerCase();
+  for (var k in JEDNOSTKI) {
+    var m = n.match(new RegExp('(\\d+|[а-яіїєґʼ]+)\\s*' + k, 'i'));
+    if (m) return { jednostka: JEDNOSTKI[k], ilosc: Number(m[1]) || SLOVA_CYFRY[m[1]] || 1 };
+  }
+  return null;
+}
+
+/* сполучники, що відділяють одну позицію фактури від наступної */
+var DZIELNIK = /(?:\bплюс\b|\bplus\b|\bтакож\b|\bта\b|\bі\b|[,;–—]|\s-\s)/gi;
+
+function ostatniDzielnik(s) {
+  var m, last = -1, len = 0;
+  DZIELNIK.lastIndex = 0;
+  while ((m = DZIELNIK.exec(s))) { last = m.index; len = m[0].length; }
+  return last < 0 ? null : { i: last, len: len };
+}
+function poDzielniku(s)      { var d = ostatniDzielnik(s); return d ? s.slice(d.i + d.len) : s; }
+function przedDzielnikiem(s) { var d = ostatniDzielnik(s); return d ? s.slice(0, d.i) : s; }
+
+function pozycjeZTekstu(t, niski, stawkaOgolna) {
+  /* усі числа, які можуть бути грошима: не NIP (10 цифр) і не відсоток */
+  var re = /(\d[\d\s ]{1,9}(?:[.,]\d{1,2})?)/g, m, kotwice = [];
+  while ((m = re.exec(t))) {
+    var czysta = String(m[1]).replace(/[\s ]/g, '');
+    var v = Number(czysta.replace(',', '.'));
+    if (!v) continue;
+    if (czysta.replace(/[.,].*/, '').length === 10) continue;             /* NIP */
+    var po = t.slice(m.index + m[1].length, m.index + m[1].length + 12);
+    if (/^\s*(?:%|відсот|procent|proc)/i.test(po)) continue;              /* ставка */
+    if (/^\s*(?:годин|год\b|штук|шт\b|кілограм|кг\b|метр|км\b|дн[ія]|день|місяц|осіб|особ)/i.test(po))
+      continue;                                                            /* кількість */
+    var przed = t.slice(Math.max(0, m.index - 22), m.index);
+    if (/(?:^|[\s,;:(])(?:ставк|stawk)[а-яіїєґa-z]*\s*(?:пдв|vat)?\s*$/i.test(przed)) continue;
+    kotwice.push({ v: v, od: m.index, do: m.index + m[1].length });
+  }
+  if (!kotwice.length) return [];
+
+  var poz = [];
+  for (var i = 0; i < kotwice.length; i++) {
+    var k = kotwice[i];
+    /* Проміжок між двома сумами треба розрізати по сполучнику,
+       інакше «консультація, плюс 1800 сам внесок» віддає обидві
+       назви обом рядкам. Ріжемо по ОСТАННЬОМУ сполучнику. */
+    var przedOkno, poOkno;
+    if (i === 0) przedOkno = t.slice(0, k.od);
+    else przedOkno = poDzielniku(t.slice(kotwice[i - 1].do, k.od));
+    if (i === kotwice.length - 1) poOkno = t.slice(k.do);
+    else poOkno = przedDzielnikiem(t.slice(k.do, kotwice[i + 1].od));
+
+    var nazwa = nazwaZOkna(przedOkno, true) || nazwaZOkna(poOkno, false);
+    var jed   = jednostkaZOkna(przedOkno) || jednostkaZOkna(poOkno) || { jednostka: null, ilosc: null };
+
+    /* власна ставка рядка, якщо названа поруч */
+    var st = null;
+    var mSt = (przedOkno + ' ' + poOkno).match(/(\d{1,2})\s*(?:%|відсотк[а-яіїєґ]*|procent[a-z]*)/);
+    if (mSt) st = String(Number(mSt[1]));
+    if (/зві?льнен|zwolnion|без\s*пдв/i.test(przedOkno + ' ' + poOkno)) st = 'zw';
+
+    poz.push({ nazwa: nazwa, ilosc: jed.ilosc, jednostka: jed.jednostka,
+               cenaNetto: k.v, stawka: st || stawkaOgolna || null });
+  }
+  return poz;
+}
+
 /* ── розбір однієї фрази: повертає ЛИШЕ те, що почуто ──────────── */
 function rozbierz(tekst, oczekuje) {
   var t = String(tekst || '').replace(/\s+/g, ' ').trim();
   var niski = t.toLowerCase();
-  var p = { nabywca: {}, pozycja: {}, waluta: null, prywatna: false, tekst: t };
+  var p = { nabywca: {}, pozycja: {}, pozycje: [], waluta: null, prywatna: false, tekst: t };
 
   /* ставка */
-  var mSt = niski.match(/ставк[а-яіїєґ]*\s*(?:пдв|vat)?\s*(\d{1,2})\s*(?:%|відсот|proc)?/) ||
+  var mSt = niski.match(/(?:^|[\s,;:(])ставк[а-яіїєґ]*\s*(?:пдв|vat)?\s*(\d{1,2})\s*(?:%|відсот|proc)?/) ||
             niski.match(/(\d{1,2})\s*(?:%|відсотк[а-яіїєґ]*|procent[a-z]*)/);
   if (mSt) p.pozycja.stawka = String(Number(mSt[1]));
   if (/зві?льнен|zwolnion|без\s*пдв/.test(niski)) p.pozycja.stawka = 'zw';
@@ -188,42 +300,10 @@ function rozbierz(tekst, oczekuje) {
   else if (/долар|dolar|usd\b/i.test(niski)) p.waluta = 'USD';
   else if (/злот|золот|zł|zloty|złot/i.test(niski)) p.waluta = 'PLN';
 
-  /* сума */
-  var cena = null, re = /(\d[\d\s ]*(?:[.,]\d{1,2})?)\s*(злот|zł|zloty|євро|euro|долар|usd)/gi, m;
-  while ((m = re.exec(niski))) {
-    var v = Number(String(m[1]).replace(/[\s ]/g, '').replace(',', '.'));
-    if (v && (cena === null || v > cena)) cena = v;
-  }
-  /* «сума 1500» / «за 1500» без слова про валюту */
-  if (cena === null) {
-    var mc = niski.match(/(?:сум[а-яіїєґ]*|ц[іи]н[а-яіїєґ]*|коштує|вартість|за)\s+(?:[а-яіїєґ]+\s+){0,2}?(\d[\d\s]{1,9}(?:[.,]\d{1,2})?)/)
-          || niski.match(/(\d[\d\s]{2,9}(?:[.,]\d{1,2})?)\s+(?:[а-яіїєґ]+\s+){0,2}?(?:ц[іи]н[а-яіїєґ]*|сум[а-яіїєґ]*|вартість)/);
-    if (mc) cena = Number(String(mc[1]).replace(/\s/g, '').replace(',', '.'));
-  }
-  if (cena !== null) p.pozycja.cenaNetto = cena;
+  /* ── позиції: кожна сума в мовленні = окремий рядок фактури ──── */
+  p.pozycje = pozycjeZTekstu(t, niski, p.pozycja.stawka);
 
-  /* кількість і одиниця */
-  for (var k in JEDNOSTKI) {
-    var mj = niski.match(new RegExp('(\\d+|[а-яіїєґʼ]+)\\s*' + k, 'i'));
-    if (mj) {
-      p.pozycja.jednostka = JEDNOSTKI[k];
-      p.pozycja.ilosc = Number(mj[1]) || SLOVA_CYFRY[mj[1]] || 1;
-      break;
-    }
-  }
-
-  /* назва послуги: спершу складені, потім одиничні */
-  for (var z = 0; z < USLUGI_ZLOZONE.length; z++) {
-    if (USLUGI_ZLOZONE[z][0].test(t)) { p.pozycja.nazwa = USLUGI_ZLOZONE[z][1]; break; }
-  }
-  if (!p.pozycja.nazwa) {
-    for (var u in USLUGI) if (niski.indexOf(u) >= 0) { p.pozycja.nazwa = USLUGI[u]; break; }
-  }
-  if (!p.pozycja.nazwa) {
-    for (var o in USLUGI_OGOLNE) if (niski.indexOf(o) >= 0) { p.pozycja.nazwa = USLUGI_OGOLNE[o]; break; }
-  }
-
-  /* NIP і приватна особа */
+    /* NIP і приватна особа */
   var mNip = t.match(/(?:nip|н[іи]п)\D{0,5}((?:\d[\s-]?){10})/i) || t.match(/\b(\d{10})\b/);
   if (mNip) { p.nabywca.nip = mNip[1].replace(/[\s-]/g, ''); p.nabywca.typ = 'NIP'; }
   if (osobaPrywatna(t)) { p.prywatna = true; p.nabywca.typ = 'BRAK'; p.nabywca.nip = null; }
@@ -260,16 +340,25 @@ function rozbierz(tekst, oczekuje) {
 /* ── злиття: нове доповнює старе, не стирає його ───────────────── */
 function scal(stan, patch) {
   stan = stan || { nabywca: { nazwa: null, nip: null, typ: null }, prywatna: false,
-                   pozycja: { nazwa: null, ilosc: null, jednostka: null, cenaNetto: null, stawka: null },
-                   waluta: null, historia: [] };
+                   pozycje: [], waluta: null, historia: [] };
   ['nazwa', 'nip', 'typ'].forEach(function (f) {
     if (patch.nabywca[f] !== undefined && patch.nabywca[f] !== null) stan.nabywca[f] = patch.nabywca[f];
   });
   if (patch.prywatna) { stan.prywatna = true; stan.nabywca.typ = 'BRAK'; stan.nabywca.nip = null; }
-  ['nazwa', 'ilosc', 'jednostka', 'cenaNetto', 'stawka'].forEach(function (f) {
-    if (patch.pozycja[f] !== undefined && patch.pozycja[f] !== null) stan.pozycja[f] = patch.pozycja[f];
-  });
   if (patch.waluta) stan.waluta = patch.waluta;
+
+  var nowe = patch.pozycje || [];
+  if (nowe.length > 1 || (nowe.length === 1 && !stan.pozycje.length)) {
+    stan.pozycje = nowe;                          /* надиктовано набір — беремо як є */
+  } else if (nowe.length === 1) {
+    /* одна сума при вже наявних рядках — це поправка останнього */
+    var ost = stan.pozycje[stan.pozycje.length - 1];
+    ['nazwa', 'ilosc', 'jednostka', 'cenaNetto', 'stawka'].forEach(function (f) {
+      if (nowe[0][f] !== null && nowe[0][f] !== undefined) ost[f] = nowe[0][f];
+    });
+  } else if (patch.pozycja && patch.pozycja.stawka && stan.pozycje.length) {
+    stan.pozycje.forEach(function (x) { if (!x.stawka) x.stawka = patch.pozycja.stawka; });
+  }
   stan.historia.push(patch.tekst);
   return stan;
 }
@@ -278,8 +367,8 @@ function scal(stan, patch) {
 function braki(stan) {
   var b = [];
   if (!stan.nabywca.nazwa) b.push('nabywca');
-  if (stan.pozycja.cenaNetto === null || stan.pozycja.cenaNetto === 0) b.push('kwota');
-  if (!stan.pozycja.nazwa) b.push('usluga');
+  if (!stan.pozycje.length || !stan.pozycje.some(function (p) { return p.cenaNetto > 0; })) b.push('kwota');
+  if (stan.pozycje.length && stan.pozycje.some(function (p) { return !p.nazwa; })) b.push('usluga');
   if (!stan.prywatna && !stan.nabywca.nip) b.push('nip');
   return b;
 }
@@ -296,19 +385,22 @@ function nastepnePytanie(stan) {
   return b.length ? { klucz: b[0], tekst: PYTANIA[b[0]] } : null;
 }
 
-/* ── готова позиція для fa3.js (зі стандартами) ────────────────── */
-function pozycjaGotowa(stan) {
-  return {
-    nazwa: stan.pozycja.nazwa || 'usługa',
-    ilosc: stan.pozycja.ilosc || 1,
-    jednostka: stan.pozycja.jednostka || 'usł.',
-    cenaNetto: stan.pozycja.cenaNetto || 0,
-    stawka: stan.pozycja.stawka || '23'
-  };
+/* ── готові позиції для fa3.js (зі стандартами) ────────────────── */
+function pozycjeGotowe(stan) {
+  return (stan.pozycje.length ? stan.pozycje : [{}]).map(function (p) {
+    return {
+      nazwa: p.nazwa || 'usługa',
+      ilosc: p.ilosc || 1,
+      jednostka: p.jednostka || 'usł.',
+      cenaNetto: p.cenaNetto || 0,
+      stawka: p.stawka || '23'
+    };
+  });
 }
+function pozycjaGotowa(stan) { return pozycjeGotowe(stan)[0]; }
 
 var ROZBIR = { rozbierz: rozbierz, scal: scal, braki: braki, nastepnePytanie: nastepnePytanie,
-               pozycjaGotowa: pozycjaGotowa, nazwiskoPl: nazwiskoPl, imiePl: imiePl, imieNazwisko: imieNazwisko };
+               pozycjeGotowe: pozycjeGotowe, pozycjaGotowa: pozycjaGotowa, pozycjeZTekstu: pozycjeZTekstu, nazwiskoPl: nazwiskoPl, imiePl: imiePl, imieNazwisko: imieNazwisko };
 if (typeof module !== 'undefined' && module.exports) module.exports = ROZBIR;
 global.ROZBIR = ROZBIR;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

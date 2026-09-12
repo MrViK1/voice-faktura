@@ -10,14 +10,13 @@ var SPRZEDAWCA = {
 var $ = function (s) { return document.querySelector(s); };
 var rejestrator = null, kawalki = [], pisze = false, ostatniXml = '';
 var STAN = null;      /* памʼять розмови: нова фраза доповнює, не стирає */
-var OCZEKUJE = null;  /* про що агент щойно спитав — щоб зрозуміти коротку відповідь */
+var OCZEKUJE = null;  /* про що агент щойно спитав */
+var STAWKI = ['23', '8', '5', '0', 'zw'];
 
 function stan(t) { $('#stan').textContent = t; }
 
 /* ── запис ─────────────────────────────────────────────────────── */
-$('#btnMic').addEventListener('click', function () {
-  if (pisze) { zatrzymaj(); } else { zacznij(); }
-});
+$('#btnMic').addEventListener('click', function () { pisze ? zatrzymaj() : zacznij(); });
 
 function zacznij() {
   navigator.mediaDevices.getUserMedia({ audio: true }).then(function (strumien) {
@@ -32,9 +31,7 @@ function zacznij() {
     pisze = true;
     $('#btnMic').classList.add('pisze');
     stan('Слухаю… натисніть ще раз, коли закінчите');
-  }).catch(function (e) {
-    stan('Немає доступу до мікрофона: ' + e.message);
-  });
+  }).catch(function (e) { stan('Немає доступу до мікрофона: ' + e.message); });
 }
 
 function zatrzymaj() {
@@ -52,11 +49,11 @@ function wyslij(blob) {
     .then(function (d) {
       $('#btnMic').classList.remove('czeka');
       if (d.error) { stan('Помилка: ' + d.error); return; }
-      if (!d.text) { stan('Нічого не почув — спробуйте ще раз'); return; }
-      stan('Готово. Можна сказати ще раз або виправити поля руками.');
+      if (!d.text)  { stan('Нічого не почув — спробуйте ще раз'); return; }
+      stan('Готово. Можна сказати ще раз або виправити руками.');
       STAN = ROZBIR.scal(STAN, ROZBIR.rozbierz(d.text, OCZEKUJE));
       pokazTekst(STAN.historia);
-      wypelnij(STAN);
+      pokazWszystko();
     })
     .catch(function (e) {
       $('#btnMic').classList.remove('czeka');
@@ -71,121 +68,148 @@ function pokazTekst(historia) {
   $('#blokTekst').hidden = false;
 }
 
-/* ── заповнення полів ──────────────────────────────────────────── */
-function wypelnij(st) {
-  var poz = ROZBIR.pozycjaGotowa(st);
-  $('#fNabywca').value = st.nabywca.nazwa || '';
-  $('#fNip').value     = st.nabywca.nip || '';
-  $('#fNazwa').value   = poz.nazwa;
-  $('#fIlosc').value   = poz.ilosc;
-  $('#fJedn').value    = poz.jednostka;
-  $('#fCena').value    = poz.cenaNetto;
-  $('#fStawka').value  = poz.stawka;
-  $('#fWaluta').value  = st.waluta || 'PLN';
-  $('#blokPola').hidden = false;
+/* ── малюємо рядки позицій ─────────────────────────────────────── */
+function rysujWiersze() {
+  var poz = STAN.pozycje.length ? STAN.pozycje : [{}];
+  $('#wiersze').innerHTML = poz.map(function (p, i) {
+    return '<div class="wiersz" data-i="' + i + '">' +
+      '<input class="w-nazwa" value="' + esc(p.nazwa || '') + '" placeholder="usługa">' +
+      '<input class="w-ilosc liczba" type="number" step="0.001" value="' + (p.ilosc || 1) + '">' +
+      '<input class="w-jedn" value="' + esc(p.jednostka || 'usł.') + '">' +
+      '<input class="w-cena liczba" type="number" step="0.01" value="' + (p.cenaNetto || 0) + '">' +
+      '<select class="w-stawka">' + STAWKI.map(function (s) {
+        return '<option value="' + s + '"' + ((p.stawka || '23') === s ? ' selected' : '') + '>' +
+               (s === 'zw' ? 'zw.' : s + '%') + '</option>';
+      }).join('') + '</select>' +
+      '<button class="usun" title="видалити">×</button>' +
+    '</div>';
+  }).join('');
 
-  var q = ROZBIR.nastepnePytanie(st);
-  OCZEKUJE = q ? q.klucz : null;
-  if (q) {
-    $('#brakuje').innerHTML = '<b>Агент питає:</b> ' + q.tekst +
-      '<br><span class="cicho">Натисніть мікрофон і відповідайте — решта збережеться.</span>';
-    $('#brakuje').hidden = false;
-    zapytajGlosem(q.tekst);
-  } else {
-    $('#brakuje').className = 'brakuje gotowe';
-    $('#brakuje').innerHTML = '<b>Усе є.</b> Можна будувати XML.';
-    $('#brakuje').hidden = false;
-    if (st.prywatna) $('#fNip').placeholder = 'osoba prywatna — BrakID';
-  }
-  przelicz();
+  $('#wiersze').querySelectorAll('.wiersz').forEach(function (w) {
+    w.querySelectorAll('input,select').forEach(function (el) {
+      el.addEventListener('input', czytajWiersze);
+      el.addEventListener('change', czytajWiersze);
+    });
+    w.querySelector('.usun').addEventListener('click', function () {
+      var i = Number(w.dataset.i);
+      STAN.pozycje.splice(i, 1);
+      if (!STAN.pozycje.length) STAN.pozycje = [{ cenaNetto: 0 }];
+      pokazWszystko();
+    });
+  });
 }
 
-function zapytajGlosem(tekst) {
-  if (!window.speechSynthesis) return;
-  try {
-    window.speechSynthesis.cancel();
-    var m = new SpeechSynthesisUtterance(tekst);
-    m.lang = 'uk-UA';
-    var g = window.speechSynthesis.getVoices().filter(function (v) { return /uk|ru|pl/i.test(v.lang); });
-    if (g.length) m.voice = g[0];
-    window.speechSynthesis.speak(m);
-  } catch (e) { /* мовчки: голос не критичний */ }
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-/* правки руками теж ідуть у памʼять, щоб наступна фраза їх не стерла */
-function zapamietajPola() {
-  if (!STAN) STAN = ROZBIR.scal(null, ROZBIR.rozbierz(''));
+function czytajWiersze() {
+  STAN.pozycje = Array.prototype.map.call($('#wiersze').querySelectorAll('.wiersz'), function (w) {
+    return {
+      nazwa: w.querySelector('.w-nazwa').value || null,
+      ilosc: Number(w.querySelector('.w-ilosc').value) || null,
+      jednostka: w.querySelector('.w-jedn').value || null,
+      cenaNetto: Number(w.querySelector('.w-cena').value) || 0,
+      stawka: w.querySelector('.w-stawka').value
+    };
+  });
   STAN.nabywca.nazwa = $('#fNabywca').value || null;
   var nip = $('#fNip').value.replace(/[\s-]/g, '');
   STAN.nabywca.nip = nip || null;
   STAN.nabywca.typ = nip ? 'NIP' : (STAN.prywatna ? 'BRAK' : null);
-  STAN.pozycja.nazwa = $('#fNazwa').value || null;
-  STAN.pozycja.ilosc = Number($('#fIlosc').value) || null;
-  STAN.pozycja.jednostka = $('#fJedn').value || null;
-  STAN.pozycja.cenaNetto = Number($('#fCena').value) || null;
-  STAN.pozycja.stawka = $('#fStawka').value || null;
-  STAN.waluta = $('#fWaluta').value || null;
+  STAN.waluta = $('#fWaluta').value || 'PLN';
+  przelicz();
+  pytanie();
 }
 
-/* ── перерахунок ───────────────────────────────────────────────── */
-['#fNabywca','#fNip','#fNazwa','#fIlosc','#fJedn','#fCena','#fStawka','#fWaluta'].forEach(function (s) {
-  $(s).addEventListener('input', function () { zapamietajPola(); przelicz(); });
-  $(s).addEventListener('change', function () { zapamietajPola(); przelicz(); });
+$('#btnDodaj').addEventListener('click', function () {
+  STAN.pozycje.push({ nazwa: null, ilosc: 1, jednostka: 'usł.', cenaNetto: 0, stawka: '23' });
+  pokazWszystko();
 });
 
-function pozycjaZPol() {
-  return {
-    nazwa: $('#fNazwa').value || 'usługa',
-    ilosc: Number($('#fIlosc').value) || 0,
-    jednostka: $('#fJedn').value || 'usł.',
-    cenaNetto: Number($('#fCena').value) || 0,
-    stawka: $('#fStawka').value
-  };
+['#fNabywca', '#fNip', '#fWaluta'].forEach(function (s) {
+  $(s).addEventListener('input', czytajWiersze);
+});
+
+/* ── повне перемалювання ───────────────────────────────────────── */
+function pokazWszystko() {
+  $('#fNabywca').value = STAN.nabywca.nazwa || '';
+  $('#fNip').value     = STAN.nabywca.nip || '';
+  $('#fWaluta').value  = STAN.waluta || 'PLN';
+  if (STAN.prywatna) $('#fNip').placeholder = 'osoba prywatna — BrakID';
+  $('#blokPola').hidden = false;
+  rysujWiersze();
+  przelicz();
+  pytanie();
+}
+
+function pytanie() {
+  var q = ROZBIR.nastepnePytanie(STAN);
+  OCZEKUJE = q ? q.klucz : null;
+  var el = $('#brakuje');
+  el.hidden = false;
+  if (q) {
+    el.className = 'brakuje';
+    el.innerHTML = '<b>Агент питає:</b> ' + q.tekst +
+      '<br><span class="cicho">Натисніть мікрофон і відповідайте — решта збережеться.</span>';
+    zapytajGlosem(q.tekst);
+  } else {
+    el.className = 'brakuje gotowe';
+    el.innerHTML = '<b>Усе є.</b> Можна будувати XML.';
+  }
+}
+
+var ostatniePytanie = '';
+function zapytajGlosem(tekst) {
+  if (!window.speechSynthesis || tekst === ostatniePytanie) return;
+  ostatniePytanie = tekst;
+  try {
+    window.speechSynthesis.cancel();
+    var m = new SpeechSynthesisUtterance(tekst);
+    m.lang = 'uk-UA';
+    var g = window.speechSynthesis.getVoices().filter(function (v) { return /uk|pl/i.test(v.lang); });
+    if (g.length) m.voice = g[0];
+    window.speechSynthesis.speak(m);
+  } catch (e) { /* голос не критичний */ }
 }
 
 function przelicz() {
-  var s = FA3.podsumuj([pozycjaZPol()]);
+  var s = FA3.podsumuj(ROZBIR.pozycjeGotowe(STAN));
   $('#sNetto').textContent  = SLOWNIE.pl(s.netto.toFixed(2));
   $('#sVat').textContent    = SLOWNIE.pl(s.vat.toFixed(2));
   $('#sBrutto').textContent = SLOWNIE.pl(s.brutto.toFixed(2));
-  $('#slownie').textContent = SLOWNIE.kwotaSlownie(s.brutto, $('#fWaluta').value);
+  $('#slownie').textContent = SLOWNIE.kwotaSlownie(s.brutto, STAN.waluta || 'PLN');
 }
 
 /* ── XML ───────────────────────────────────────────────────────── */
 $('#btnXml').addEventListener('click', function () {
   var dzis = new Date().toISOString().slice(0, 10);
-  zapamietajPola();
-  var nip = $('#fNip').value.replace(/[\s-]/g, '');
+  var nip = (STAN.nabywca.nip || '');
   var doc = {
     sprzedawca: SPRZEDAWCA,
-    nabywca: { typ: nip ? 'NIP' : 'BRAK', nip: nip,
-               nazwa: $('#fNabywca').value || 'Nabywca' },
+    nabywca: { typ: nip ? 'NIP' : 'BRAK', nip: nip, nazwa: STAN.nabywca.nazwa || 'Nabywca' },
     faktura: {
       numer: 'FV/GLOS/' + dzis.replace(/-/g, '') + '/1',
       dataWystawienia: dzis, dataSprzedazy: dzis,
-      miejsceWystawienia: 'Warszawa', waluta: $('#fWaluta').value || 'PLN',
+      miejsceWystawienia: 'Warszawa', waluta: STAN.waluta || 'PLN',
       platnosc: { forma: '6', termin: dzis }, rodzaj: 'VAT'
     },
-    pozycje: [pozycjaZPol()]
+    pozycje: ROZBIR.pozycjeGotowe(STAN)
   };
 
-  var bledy = FA3.sprawdz(doc);
-  var w = $('#walidacja');
+  var bledy = FA3.sprawdz(doc), w = $('#walidacja');
   w.hidden = false;
   if (bledy.length) {
     w.className = 'walidacja';
     w.innerHTML = '<b>Схема FA(3) не прийме:</b><br>' + bledy.join('<br>');
-    $('#blokXml').hidden = true;
-    $('#btnPobierz').hidden = true;
+    $('#blokXml').hidden = true; $('#btnPobierz').hidden = true;
     return;
   }
   w.className = 'walidacja dobra';
-  w.textContent = 'Перевірку схеми FA(3) пройдено — помилок немає.';
-
+  w.textContent = 'Перевірку схеми FA(3) пройдено — помилок немає. Позицій: ' + doc.pozycje.length + '.';
   ostatniXml = FA3.buildFA3(doc, { systemInfo: 'Voice Faktura (AssemblyAI)' });
   $('#xml').textContent = ostatniXml;
-  $('#blokXml').hidden = false;
-  $('#btnPobierz').hidden = false;
+  $('#blokXml').hidden = false; $('#btnPobierz').hidden = false;
 });
 
 $('#btnPobierz').addEventListener('click', function () {
@@ -195,12 +219,9 @@ $('#btnPobierz').addEventListener('click', function () {
   a.click();
 });
 
-
-/* ── почати заново ─────────────────────────────────────────────── */
-var btnNowa = document.getElementById('btnNowa');
-if (btnNowa) btnNowa.addEventListener('click', function () {
-  STAN = null; OCZEKUJE = null; ostatniXml = '';
-  ['#blokTekst','#blokPola','#blokXml'].forEach(function (s) { $(s).hidden = true; });
+$('#btnNowa').addEventListener('click', function () {
+  STAN = null; OCZEKUJE = null; ostatniXml = ''; ostatniePytanie = '';
+  ['#blokTekst', '#blokPola', '#blokXml'].forEach(function (s) { $(s).hidden = true; });
   $('#walidacja').hidden = true;
   stan('Натисніть і скажіть, кому і за що виставити фактуру');
 });
