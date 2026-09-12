@@ -130,6 +130,15 @@ function imiePl(slowo) {
 
 function nazwiskoPl(slowo) {
   var s = slowo.toLowerCase();
+  /* Жіноче по-батькові та жіночі прізвища на -а НЕ чіпаємо:
+     Іванівна, Ковальська, Шевченкова. Інакше правила зріжуть кінцівку. */
+  if (/(?:[іи]вна|овна|евна|ївна)$/.test(s) || /(?:[сц]ька|ова|ева|іна|ина)$/.test(s)) {
+    s = s.replace(/ська$/, 'ska').replace(/цька$/, 'cka');
+    var o = '';
+    for (var j = 0; j < s.length; j++) o += (TRANSLIT[s[j]] !== undefined ? TRANSLIT[s[j]] : s[j]);
+    o = o.replace(/ii/g, 'i');
+    return o.charAt(0).toUpperCase() + o.slice(1);
+  }
   /* давальний відмінок: Ковальському → Ковальський */
   s = s.replace(/ському$/, 'ський').replace(/цькому$/, 'цький')
        .replace(/ову$/, 'ов').replace(/еву$/, 'ев').replace(/іну$/, 'ін')
