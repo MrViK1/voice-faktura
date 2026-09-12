@@ -51,8 +51,18 @@
 
     <div class="pola zwolnienie" id="blokZw" hidden>
       <label>Podstawa zwolnienia z VAT
-        <input id="fZw" placeholder="art. 113 ust. 1 ustawy o VAT">
+        <select id="fZwSel">
+          <option value="113">art. 113 ust. 1 ustawy o VAT — limit 200 000 zł (najczęściej)</option>
+          <option value="43">art. 43 ust. 1 ustawy o VAT — zwolnienie przedmiotowe (medycyna, edukacja, finanse)</option>
+          <option value="82">art. 82 ust. 3 ustawy o VAT — rozporządzenie Ministra Finansów</option>
+          <option value="dyr">art. 132 dyrektywy 2006/112/WE — podstawa unijna</option>
+          <option value="inna">inna — wpiszę sam</option>
+        </select>
       </label>
+      <label id="fZwInnaBox" hidden>Wpisz podstawę
+        <input id="fZwInna" placeholder="np. art. 43 ust. 1 pkt 19 ustawy o VAT">
+      </label>
+      <div class="pidkazka-pl" id="fZwOpis"></div>
     </div>
 
     <div id="brakuje" class="brakuje" hidden></div>

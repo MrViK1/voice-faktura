@@ -13,6 +13,38 @@ var STAN = null;      /* памʼять розмови: нова фраза до
 var OCZEKUJE = null;  /* про що агент щойно спитав */
 var STAWKI = ['23', '8', '5', '0', 'zw'];
 
+/* Законні підстави звільнення. P_19A — ustawa, P_19B — akt UE, P_19C — inna. */
+var PODSTAWY = {
+  '113': { podstawa: 'art. 113 ust. 1 ustawy o VAT', rodzaj: 'ustawa',
+           opis: 'Найчастіший випадок: ви не платник ПДВ, бо обіг не перевищив 200 000 злотих за рік.' },
+  '43':  { podstawa: 'art. 43 ust. 1 ustawy o VAT', rodzaj: 'ustawa',
+           opis: 'Звільнення за видом послуги: медицина, освіта, фінанси, соціальна допомога.' },
+  '82':  { podstawa: 'art. 82 ust. 3 ustawy o VAT', rodzaj: 'ustawa',
+           opis: 'Звільнення, введене окремим розпорядженням Міністра фінансів.' },
+  'dyr': { podstawa: 'art. 132 dyrektywy 2006/112/WE', rodzaj: 'dyrektywa',
+           opis: 'Підстава з права ЄС, а не польського закону. У XML піде як P_19B.' },
+  'inna':{ podstawa: '', rodzaj: 'inna',
+           opis: 'Впишіть підставу дослівно, як вам сказав бухгалтер або юрист.' }
+};
+
+function kluczZPodstawy(txt) {
+  if (!txt) return null;
+  if (/113/.test(txt)) return '113';
+  if (/\b43\b/.test(txt)) return '43';
+  if (/\b82\b/.test(txt)) return '82';
+  if (/dyrektyw/i.test(txt)) return 'dyr';
+  return 'inna';
+}
+
+function czytajZwolnienie() {
+  var k = $('#fZwSel').value;
+  var p = PODSTAWY[k];
+  $('#fZwInnaBox').hidden = k !== 'inna';
+  $('#fZwOpis').textContent = p.opis;
+  var txt = k === 'inna' ? $('#fZwInna').value.trim() : p.podstawa;
+  STAN.zwolnienie = txt ? { rodzaj: p.rodzaj, podstawa: txt } : null;
+}
+
 function stan(t) { $('#stan').textContent = t; }
 
 /* ── запис ─────────────────────────────────────────────────────── */
@@ -122,8 +154,7 @@ function czytajWiersze() {
   STAN.nabywca.nip = nip || null;
   STAN.nabywca.typ = nip ? 'NIP' : (STAN.prywatna ? 'BRAK' : null);
   STAN.waluta = $('#fWaluta').value || 'PLN';
-  var pz = $('#fZw').value.trim();
-  STAN.zwolnienie = pz ? { rodzaj: /dyrektyw/i.test(pz) ? 'dyrektywa' : 'ustawa', podstawa: pz } : null;
+  if (!$('#blokZw').hidden) czytajZwolnienie();
   przelicz();
   pytanie();
 }
@@ -133,9 +164,10 @@ $('#btnDodaj').addEventListener('click', function () {
   pokazWszystko();
 });
 
-['#fNabywca', '#fNip', '#fWaluta', '#fZw'].forEach(function (s) {
+['#fNabywca', '#fNip', '#fWaluta', '#fZwInna'].forEach(function (s) {
   $(s).addEventListener('input', czytajWiersze);
 });
+$('#fZwSel').addEventListener('change', function () { czytajZwolnienie(); pytanie(); });
 
 /* ── повне перемалювання ───────────────────────────────────────── */
 function pokazWszystko() {
@@ -145,7 +177,14 @@ function pokazWszystko() {
   if (STAN.prywatna) $('#fNip').placeholder = 'osoba prywatna — BrakID';
   var maZw = STAN.pozycje.some(function (p) { return p.stawka === 'zw'; });
   $('#blokZw').hidden = !maZw;
-  $('#fZw').value = (STAN.zwolnienie && STAN.zwolnienie.podstawa) || '';
+  if (maZw) {
+    var k = kluczZPodstawy(STAN.zwolnienie && STAN.zwolnienie.podstawa) || '113';
+    $('#fZwSel').value = k;
+    if (k === 'inna') $('#fZwInna').value = (STAN.zwolnienie && STAN.zwolnienie.podstawa) || '';
+    $('#fZwInnaBox').hidden = k !== 'inna';
+    $('#fZwOpis').textContent = PODSTAWY[k].opis;
+    if (!STAN.zwolnienie) czytajZwolnienie();   /* ставимо найчастіший варіант одразу */
+  }
   $('#blokPola').hidden = false;
   rysujWiersze();
   przelicz();
@@ -265,11 +304,12 @@ function zModelu(d) {
     STAN.nabywca.typ = STAN.nabywca.nip ? 'NIP' : (STAN.prywatna ? 'BRAK' : null);
   }
   if (d.waluta) STAN.waluta = d.waluta;
-  if (d.zwolnienie && d.zwolnienie.podstawa)
-    STAN.zwolnienie = { rodzaj: 'ustawa', podstawa: d.zwolnienie.podstawa };
-  else if (STAN.zwolnienie && STAN.zwolnienie.podstawa &&
-           !/(?:art|ustaw|dyrektyw|§)/i.test(STAN.zwolnienie.podstawa))
-    STAN.zwolnienie = null;   /* у полі було сміття — модель його не підтвердила */
+  if (d.zwolnienie && d.zwolnienie.podstawa) {
+    var kk = kluczZPodstawy(d.zwolnienie.podstawa) || 'inna';
+    STAN.zwolnienie = kk === 'inna'
+      ? { rodzaj: 'inna', podstawa: d.zwolnienie.podstawa }
+      : { rodzaj: PODSTAWY[kk].rodzaj, podstawa: PODSTAWY[kk].podstawa };
+  }
   if (d.pozycje && d.pozycje.length) {
     STAN.pozycje = d.pozycje.map(function (p) {
       return { nazwa: p.nazwa || null, ilosc: Number(p.ilosc) || 1,

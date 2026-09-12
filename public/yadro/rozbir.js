@@ -402,8 +402,8 @@ function braki(stan) {
   if (!stan.pozycje.length || !stan.pozycje.some(function (p) { return p.cenaNetto > 0; })) b.push('kwota');
   if (stan.pozycje.length && stan.pozycje.some(function (p) { return !p.nazwa; })) b.push('usluga');
   if (!stan.prywatna && !stan.nabywca.nip) b.push('nip');
-  var maZw = stan.pozycje.some(function (p) { return p.stawka === 'zw'; });
-  if (maZw && !(stan.zwolnienie && stan.zwolnienie.podstawa)) b.push('zwolnienie');
+  /* підставу звільнення більше не питаємо голосом: у полі стоїть список
+     із типовим варіантом, і людина вибирає, а не пише юридичний текст */
   return b;
 }
 

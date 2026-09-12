@@ -87,3 +87,7 @@ button.mala.plus{float:none;display:block;width:100%;border:none;border-top:1px 
 
 .znak{float:right;font-size:10px;letter-spacing:.06em;color:var(--slaby);
   border:1px solid var(--ramka);border-radius:6px;padding:2px 7px;text-transform:none}
+
+.pola.zwolnienie select{background:#0f141a;border:1px solid var(--ramka);color:var(--tekst);
+  border-radius:9px;padding:10px 12px;font-size:15px;font-family:inherit;width:100%}
+.pidkazka-pl{grid-column:1/-1;font-size:13px;color:var(--slaby);margin-top:-4px}
